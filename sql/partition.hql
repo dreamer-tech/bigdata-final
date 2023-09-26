@@ -14,8 +14,7 @@ create external table artists_part(
         genres varchar(1024),
         artist_name varchar(1024),
         popularity int
-) 	partitioned by (rating varchar(32))
-	clustered by (artist_id) into 5 buckets
+) 	clustered by (artist_id) into 5 buckets
 	stored as avro location '/project/projectdata/artists_part'
 	tblproperties ('AVRO.COMPRESS'='SNAPPY');
 
