@@ -14,7 +14,6 @@ sqoop import-all-tables \
     -Dmapreduce.job.user.classpath.first=true \
     --connect jdbc:postgresql://localhost/project \
     --username postgres \
-    --password BnaJsz8kmdFpVN7S \
     --warehouse-dir /project \
     --as-avrodatafile \
     --compression-codec=snappy \
