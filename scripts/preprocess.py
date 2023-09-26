@@ -7,13 +7,22 @@ def convert_date(d):
     return d
 
 
+def pure_text(d):
+    d = d.replace('"', '')
+    d = d.replace("'", '')
+    return d
+
+
 if __name__ == '__main__':
     artists_df = pd.read_csv('./data/artists.csv')
     tracks_df = pd.read_csv('./data/tracks.csv')
 
     artists_df['followers'].fillna(0.0, inplace=True)
+    artists_df['name'] = artists_df['name'].apply(pure_text)
 
     tracks_df['release_date'] = tracks_df['release_date'].apply(convert_date)
+    tracks_df['artists'] = tracks_df['artists'].apply(lambda artists: str([pure_text(artist)
+                                                                           for artist in eval(artists)]))
 
-    artists_df.to_csv("./data/artists.csv", index=False, escapechar='\\', doublequote=False)
-    tracks_df.to_csv("./data/tracks.csv", index=False, escapechar='\\', doublequote=False)
+    artists_df.to_csv("./data/artists.csv", index=False)
+    tracks_df.to_csv("./data/tracks.csv", index=False)
