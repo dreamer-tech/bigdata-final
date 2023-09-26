@@ -44,4 +44,4 @@ create external table tracks_part(
         tblproperties ('AVRO.COMPRESS'='SNAPPY');
 
 insert into artists_part SELECT * FROM artists;
-insert into tracks_part SELECT track_id, track_name, popularity, duration_ms, explicit, artists, id_artists, cast(release_date as date), danceability, energy, track_key, loudness, mode, speechiness, acousticness, instrumentalness, liveness, valenece, tempo, time_signature FROM tracks;
+insert into tracks_part SELECT track_id, track_name, popularity, duration_ms, explicit, artists, id_artists, cast(to_date(from_utc_timestamp(release_date, "+00")) as date), danceability, energy, track_key, loudness, mode, speechiness, acousticness, instrumentalness, liveness, valenece, tempo, time_signature FROM tracks;
