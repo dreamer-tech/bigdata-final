@@ -12,6 +12,12 @@ curl -Lb ./cookie "https://drive.google.com/uc?export=download&confirm=`awk '/do
 
 unzip -o ./${filename} -d ./data
 
+sed -i 's/,\[/,{/' data/artists.csv
+sed -i 's/\],/},/' data/artists.csv
+
+sed -i 's/,\[/,{/' data/tracks.csv
+sed -i 's/\],/},/' data/tracks.csv
+
 rm ./cookie
 rm ${filename}
 rm -f ./output/*.csv
