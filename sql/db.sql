@@ -7,7 +7,7 @@ create table artists(
 	artist_id text not null primary key,
 	followers float,
 	genres text[],
-    artist_name string,
+    artist_name text,
     popularity integer
 );
 
