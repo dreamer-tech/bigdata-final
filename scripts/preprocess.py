@@ -15,5 +15,5 @@ if __name__ == '__main__':
 
     tracks_df['release_date'] = tracks_df['release_date'].apply(convert_date)
 
-    artists_df.to_csv("./data/artists.csv", index=False, escapechar='\\')
-    tracks_df.to_csv("./data/tracks.csv", index=False, escapechar='\\')
+    artists_df.to_csv("./data/artists.csv", index=False, escapechar='\\', doublequote=False)
+    tracks_df.to_csv("./data/tracks.csv", index=False, escapechar='\\', doublequote=False)
