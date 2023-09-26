@@ -4,6 +4,8 @@ import pandas as pd
 def convert_date(d):
     if d.count('-') == 0:
         return d + '-01-01'
+    if d.count('-') == 1:
+        return d + '-01'
     return d
 
 
