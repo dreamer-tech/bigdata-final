@@ -12,6 +12,8 @@ curl -Lb ./cookie "https://drive.google.com/uc?export=download&confirm=`awk '/do
 
 unzip -o ./${filename} -d ./data
 
+python ./scripts/preprocess.py
+
 sed -i 's/\[/{/' ./data/artists.csv
 sed -i 's/\]/}/' ./data/artists.csv
 
