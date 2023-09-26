@@ -1,7 +1,7 @@
 import pandas as pd
 
 
-def convert_date(d: str):
+def convert_date(d):
     if d.count('-') == 0:
         return d + '-01-01'
     return d
