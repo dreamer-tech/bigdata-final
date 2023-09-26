@@ -10,9 +10,7 @@ def convert_date(d):
 
 
 def pure_text(d):
-    d = d.replace('"', '')
-    d = d.replace("'", '')
-    return d
+    return ''.join([c for c in d if c.isalnum() or c == ' '])
 
 
 if __name__ == '__main__':
