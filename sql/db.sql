@@ -12,8 +12,8 @@ create table artists(
 );
 
 create table tracks(
-	track_id integer not null primary key,
-	track_name integer,
+	track_id text not null primary key,
+	track_name text,
 	popularity integer,
 	duration_ms integer,
 	explicit integer,
