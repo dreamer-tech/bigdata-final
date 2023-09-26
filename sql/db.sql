@@ -6,7 +6,7 @@ START TRANSACTION;
 create table artists(
 	artist_id text not null primary key,
 	followers float,
-	genres text[],
+	genres text,
     artist_name text,
     popularity integer
 );
@@ -17,8 +17,8 @@ create table tracks(
 	popularity integer,
 	duration_ms integer,
 	explicit integer,
-	artists text[],
-	id_artists text[],
+	artists text,
+	id_artists text,
 	release_date date,
 	danceability float,
 	energy float,
