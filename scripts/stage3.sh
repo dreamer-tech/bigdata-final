@@ -28,8 +28,8 @@ rm -f output/output/best_rf_params.csv
 cat output/pda/best_rf_params/* >> output/best_rf_params.csv
 rm -f output/output/best_rf_scores.csv
 cat output/pda/best_rf_scores/* >> output/best_rf_scores.csv
-rm -f output/rf_recommendations.json
-cat output/pda/rf_recommendations/* >> output/rf_recommendations.json
+rm -f output/rf_popularity.json
+cat output/pda/rf_popularity/* >> output/rf_popularity.json
 
 rm -rf models/*/
 mv -f output/models/* models/

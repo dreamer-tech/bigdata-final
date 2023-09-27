@@ -84,7 +84,6 @@ if __name__ == '__main__':
     rf_data = df_tracks_enc
 
     rmse_evaluator = RegressionEvaluator(metricName="rmse", labelCol="popularity")
-    r2_evaluator = RegressionEvaluator(metricName="r2", labelCol="popularity")
 
     ## Cross-validation
     rf_train_data, rf_test_data = rf_data.randomSplit([0.7, 0.3], seed=42)
@@ -101,7 +100,7 @@ if __name__ == '__main__':
         estimatorParamMaps=rf_params,
         evaluator=rmse_evaluator,
         parallelism=2,
-        numFolds=4,
+        numFolds=2,
         seed=42,
     )
     cv_rf_model = cv_rf.fit(rf_train_data)
@@ -156,3 +155,7 @@ if __name__ == '__main__':
     best_rf_scores_df.coalesce(1).write.mode("overwrite").format("csv").option(
         "sep", ","
     ).option("header", "true").csv(PATH + "pda/best_rf_scores")
+
+    rf_predictions.select("prediction").limit(SAVE_LIMIT).coalesce(1).write.mode("overwrite").format(
+        "json"
+    ).json(PATH + "pda/rf_popularity")
