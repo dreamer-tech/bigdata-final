@@ -75,8 +75,8 @@ if __name__ == '__main__':
     artists = spark.read.format("avro").table("projectdb.artists_part")
     artists.createOrReplaceTempView("artists")
 
-    df_tracks = spark.sql("select * from tracks limit 100000")
-    df_artists = spark.sql("select * from artists limit 100000")
+    df_tracks = spark.sql("select * from tracks limit 10000")
+    df_artists = spark.sql("select * from artists limit 10000")
 
     artist_popularity, artist_followers = defaultdict(int), defaultdict(float)
     for artist_id, followers, popularity in df_artists.select("artist_id", "followers", "popularity").collect():
@@ -225,7 +225,15 @@ if __name__ == '__main__':
         # .withColumn("is_recommended_enc", F.col("is_recommended_enc") + 1)
         # .withColumn("prediction", F.col("prediction") + 1)
     )
-    rf_predictions.show()
+
+    rmse = RegressionEvaluator(labelCol="popularity", predictionCol="prediction", metricName="rmse")
+    rmse = rmse.evaluate(rf_predictions)
+    print(rmse)
+
+    r2 = RegressionEvaluator(labelCol="popularity", predictionCol="prediction", metricName="r2")
+    r2 = r2.evaluate(rf_predictions)
+    print(r2)
+
     exit(0)
 
     rf_recommendations, rf_rmse_score, rf_r2_score = evaluate_recommendations(
