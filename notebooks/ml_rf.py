@@ -51,11 +51,11 @@ if __name__ == '__main__':
     df_tracks = df_tracks.withColumn("release_year", F.year("release_date"))
 
     # artists_df.rename(columns={'id': 'id_artists', 'popularity': 'artists_popularity'}, inplace=True)
-    df_artists = df_artists.withColumn("id_artists", F.col("id"))
+    df_artists = df_artists.withColumn("id_artists", F.col("artist_id"))
     df_artists = df_artists.withColumn("artists_popularity", F.col("popularity"))
 
     # artists_df.drop(['genres', 'name'], axis=1, inplace=True)
-    df_artists = df_artists.drop("id", "popularity")
+    df_artists = df_artists.drop("artist_id", "popularity", "genres", "artist_name")
 
     # tracks_df = tracks_df.merge(artists_df, on='id_artists')
     df_tracks = df_tracks.join(df_artists, on='id_artists')
