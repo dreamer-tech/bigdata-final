@@ -1,3 +1,5 @@
+import datetime
+
 import pandas as pd
 from pyspark.ml import Pipeline
 from pyspark.ml.classification import RandomForestClassifier
@@ -47,9 +49,8 @@ if __name__ == '__main__':
 
     print(df_tracks.head(3))
 
-    exit(0)
-
-    # df_games = df_games.withColumn("year", F.year("date_release"))
+    df_tracks = df_tracks.withColumn("release_year", F.year("release_date"))
+    print(df_tracks.head(3))
 
     # df_games = df_games.drop("title", "steam_deck", "price_final", "date_release")
     # df_games = (
@@ -57,8 +58,6 @@ if __name__ == '__main__':
     #     .withColumn("mac", F.col("mac").cast("double"))
     #     .withColumn("win", F.col("win").cast("double"))
     # )
-
-    df_tracks['release_year'] = [int(i.split('-')[0]) for i in df_tracks['release_date']]
 
     # rating_dict = {
     #     "Overwhelmingly Positive": 8,
@@ -89,8 +88,7 @@ if __name__ == '__main__':
         "instrumentalness",
         "release_year",
         "followers",
-        "popularity",
-        # "delta_days"
+        "popularity"
     ]
     vector_assembler = VectorAssembler(
         inputCols=feature_columns_rf, outputCol="features_unscaled"
@@ -107,6 +105,8 @@ if __name__ == '__main__':
     rf_features_df.coalesce(1).write.mode("overwrite").format("csv").option(
         "sep", ","
     ).option("header", "true").csv(PATH + "pda/rf_features")
+
+    exit(0)
 
     rf_data = df_tracks_enc.select("user_id", "app_id", "is_recommended_enc", "features")
     rf_data.show()
