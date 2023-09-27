@@ -2,4 +2,4 @@ pylint
 pyspark==3.0.3
 numpy==1.15.4
 pandas==0.24.2
-streamlit
+streamlit==0.50.0

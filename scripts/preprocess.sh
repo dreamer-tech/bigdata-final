@@ -14,12 +14,6 @@ unzip -o ./${filename} -d ./data
 
 python ./scripts/preprocess.py
 
-#sed -i 's/\[/{/g' ./data/artists.csv
-#sed -i 's/\]/}/g' ./data/artists.csv
-#
-#sed -i 's/\[/{/g' ./data/tracks.csv
-#sed -i 's/\]/}/g' ./data/tracks.csv
-
 rm ./cookie
 rm ${filename}
 rm -f ./output/*.csv

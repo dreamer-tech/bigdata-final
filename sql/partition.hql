@@ -9,23 +9,23 @@ drop table if exists artists_part;
 drop table if exists tracks_part;
 
 create external table artists_part(
-        artist_id varchar(1024),
+        artist_id varchar(16384),
         followers float,
-        genres varchar(1024),
-        artist_name varchar(1024),
+        genres varchar(16384),
+        artist_name varchar(16384),
         popularity int
 ) 	clustered by (artist_id) into 5 buckets
 	stored as avro location '/project/projectdata/artists_part'
 	tblproperties ('AVRO.COMPRESS'='SNAPPY');
 
 create external table tracks_part(
-        track_id varchar(1024),
-        track_name varchar(1024),
+        track_id varchar(16384),
+        track_name varchar(16384),
         popularity int,
         duration_ms int,
         explicit int,
-        artists varchar(1024),
-        id_artists varchar(1024),
+        artists varchar(16384),
+        id_artists varchar(16384),
         release_date date,
         danceability float,
         energy float,
