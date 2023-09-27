@@ -36,6 +36,11 @@ if __name__ == '__main__':
 
     print(spark.catalog.listTables("projectdb"))
 
+    tracks = spark.read.format("avro").table("projectdb.tracks_part")
+    tracks.createOrReplaceTempView("tracks")
+
+    tracks.printSchema()
+
     df_tracks = spark.sql("select * from tracks")
 
     print(df_tracks.printSchema())
