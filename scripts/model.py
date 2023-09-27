@@ -10,7 +10,7 @@ from collections import defaultdict
 
 
 SAVE_LIMIT = 100
-PATH = "../output/"
+PATH = "output/"
 
 
 if __name__ == '__main__':
