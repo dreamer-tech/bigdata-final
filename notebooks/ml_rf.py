@@ -15,10 +15,6 @@ SAVE_LIMIT = 100
 PATH = "../output/"
 
 
-rmse_evaluator = RegressionEvaluator(metricName="rmse", predictionCol='', labelCol="popularity")
-r2_evaluator = RegressionEvaluator(metricName="r2", predictionCol='', labelCol="popularity")
-
-
 # def get_preference_data(prediction_df):
 #     initial_recs = get_preferences(
 #         prediction_df,
@@ -167,6 +163,9 @@ if __name__ == '__main__':
 
     rf_data = df_tracks_enc
     # rf_data.show()
+
+    rmse_evaluator = RegressionEvaluator(metricName="rmse", labelCol="popularity")
+    r2_evaluator = RegressionEvaluator(metricName="r2", labelCol="popularity")
 
     ## Cross-validation
     rf_train_data, rf_test_data = rf_data.randomSplit([0.7, 0.3], seed=42)
