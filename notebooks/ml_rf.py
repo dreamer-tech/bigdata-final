@@ -1,5 +1,5 @@
 from pyspark.ml import Pipeline
-from pyspark.ml.classification import RandomForestClassifier
+from pyspark.ml.regression import RandomForestRegressor
 from pyspark.ml.evaluation import RegressionEvaluator
 from pyspark.ml.feature import VectorAssembler, MinMaxScaler
 from pyspark.ml.tuning import ParamGridBuilder, CrossValidator
@@ -7,6 +7,7 @@ from pyspark.sql import SparkSession
 import pyspark.sql.functions as F
 from pyspark.sql.types import IntegerType, FloatType
 from collections import defaultdict
+
 
 SAVE_LIMIT = 100
 PATH = "../output/"
@@ -38,8 +39,8 @@ if __name__ == '__main__':
     artists = spark.read.format("avro").table("projectdb.artists_part")
     artists.createOrReplaceTempView("artists")
 
-    df_tracks = spark.sql("select * from tracks limit 10000")
-    df_artists = spark.sql("select * from artists limit 10000")
+    df_tracks = spark.sql("select * from tracks limit 50000")
+    df_artists = spark.sql("select * from artists limit 50000")
 
     artist_popularity, artist_followers = defaultdict(int), defaultdict(float)
     for artist_id, followers, popularity in df_artists.select("artist_id", "followers", "popularity").collect():
@@ -71,8 +72,8 @@ if __name__ == '__main__':
     )
     scaler = MinMaxScaler(inputCol="features_unscaled", outputCol="features")
     pipeline = Pipeline(stages=[vector_assembler, scaler])
-    features_pipeline_model_svc = pipeline.fit(df_tracks_enc)
-    df_tracks_enc = features_pipeline_model_svc.transform(df_tracks_enc)
+    features_pipeline_model = pipeline.fit(df_tracks_enc)
+    df_tracks_enc = features_pipeline_model.transform(df_tracks_enc)
 
     rf_features = [(c,) for c in feature_columns_rf]
     rf_features_df = spark.createDataFrame(data=rf_features, schema=["feature"])
@@ -89,7 +90,7 @@ if __name__ == '__main__':
     ## Cross-validation
     rf_train_data, rf_test_data = rf_data.randomSplit([0.7, 0.3], seed=42)
 
-    rf_model = RandomForestClassifier(labelCol="popularity", seed=42)
+    rf_model = RandomForestRegressor(labelCol="popularity", seed=42)
     rf_params = (
         ParamGridBuilder()
         .addGrid(rf_model.numTrees, [5, 7, 10])
@@ -101,7 +102,7 @@ if __name__ == '__main__':
         estimatorParamMaps=rf_params,
         evaluator=rmse_evaluator,
         parallelism=2,
-        numFolds=2,
+        numFolds=4,
         seed=42,
     )
     cv_rf_model = cv_rf.fit(rf_train_data)
