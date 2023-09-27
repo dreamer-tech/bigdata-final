@@ -168,7 +168,7 @@ if __name__ == '__main__':
     rf_end_time = time.time()
 
     with open(PATH + 'rf_time.txt', 'w') as f:
-        f.write(str(int(rf_end_time - rf_start_time)) + 'sec.')
+        f.write(str(int(rf_end_time - rf_start_time)) + ' sec.')
 
 
     # GBT model
@@ -257,4 +257,4 @@ if __name__ == '__main__':
     gbt_end_time = time.time()
 
     with open(PATH + 'gbt_time.txt', 'w') as f:
-        f.write(str(int(gbt_end_time - gbt_start_time)) + 'sec.')
+        f.write(str(int(gbt_end_time - gbt_start_time)) + ' sec.')

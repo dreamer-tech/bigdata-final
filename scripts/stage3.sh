@@ -22,11 +22,11 @@ cat output/pda/gbt_popularity/* >> output/gbt_popularity.json
 
 rm -f output/cv_rf_config.csv
 cat output/pda/cv_rf_config/* >> output/cv_rf_config.csv
-rm -f output/output/rf_features.csv
+rm -f output/rf_features.csv
 cat output/pda/rf_features/* >> output/rf_features.csv
-rm -f output/output/best_rf_params.csv
+rm -f output/best_rf_params.csv
 cat output/pda/best_rf_params/* >> output/best_rf_params.csv
-rm -f output/output/best_rf_scores.csv
+rm -f output/best_rf_scores.csv
 cat output/pda/best_rf_scores/* >> output/best_rf_scores.csv
 rm -f output/rf_popularity.json
 cat output/pda/rf_popularity/* >> output/rf_popularity.json
