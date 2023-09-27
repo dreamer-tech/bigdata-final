@@ -9,6 +9,7 @@ from pyspark.ml.tuning import ParamGridBuilder, CrossValidator
 from pyspark.sql import SparkSession
 import pyspark.sql.functions as F
 from pyspark.sql.types import StringType, IntegerType, FloatType
+from collections import defaultdict
 
 SAVE_LIMIT = 100
 PATH = "../output/"
@@ -18,7 +19,7 @@ if __name__ == '__main__':
     spark = (
         SparkSession.builder.appName("BD Project")
         .master("local[*]")
-        .config("spark.driver.memory", "4g")
+        .config("spark.driver.memory", "3g")
         .config("spark.sql.catalogImplementation", "hive")
         .config("hive.metastore.uris", "thrift://sandbox-hdp.hortonworks.com:9083")
         .config("spark.sql.avro.compression.codec", "snappy")
@@ -40,10 +41,10 @@ if __name__ == '__main__':
     artists = spark.read.format("avro").table("projectdb.artists_part")
     artists.createOrReplaceTempView("artists")
 
-    df_tracks = spark.sql("select * from tracks")
-    df_artists = spark.sql("select * from artists")
+    df_tracks = spark.sql("select * from tracks limit 100000")
+    df_artists = spark.sql("select * from artists limit 100000")
 
-    artist_popularity, artist_followers = {}, {}
+    artist_popularity, artist_followers = defaultdict(int), defaultdict(float)
     for artist_id, followers, popularity in df_artists.select("artist_id", "followers", "popularity").collect():
         artist_followers[artist_id] = followers
         artist_popularity[artist_id] = popularity
@@ -70,9 +71,6 @@ if __name__ == '__main__':
 
     # tracks_df = tracks_df.merge(artists_df, on='id_artists')
     # df_tracks = df_tracks.join(df_artists, on='id_artists')
-
-    print(df_tracks.head(3))
-    exit(0)
 
     # df_games = df_games.drop("title", "steam_deck", "price_final", "date_release")
     # df_games = (
@@ -109,7 +107,8 @@ if __name__ == '__main__':
         "loudness",
         "instrumentalness",
         "release_year",
-        "followers",
+        "artists_followers",
+        "artists_popularity",
         "popularity"
     ]
     vector_assembler = VectorAssembler(
@@ -128,17 +127,15 @@ if __name__ == '__main__':
         "sep", ","
     ).option("header", "true").csv(PATH + "pda/rf_features")
 
-    exit(0)
-
-    rf_data = df_tracks_enc.select("user_id", "app_id", "is_recommended_enc", "features")
+    rf_data = df_tracks_enc
     rf_data.show()
 
     ## Cross-validation
     rf_train_data, rf_test_data = rf_data.randomSplit([0.7, 0.3], seed=42)
 
-    rmse_evaluator = RegressionEvaluator(metricName="rmse", labelCol="is_recommended_enc")
+    rmse_evaluator = RegressionEvaluator(metricName="rmse", labelCol="popularity")
 
-    rf_model = RandomForestClassifier(labelCol="is_recommended_enc", seed=42)
+    rf_model = RandomForestClassifier(labelCol="popularity", seed=42)
     rf_params = (
         ParamGridBuilder()
         .addGrid(rf_model.numTrees, [5, 7, 10])
@@ -184,6 +181,8 @@ if __name__ == '__main__':
 
     final_rf = cv_rf_model.bestModel
     final_rf.write().overwrite().save(PATH + "models/rf")
+
+    exit(0)
 
     ## Testing
 
