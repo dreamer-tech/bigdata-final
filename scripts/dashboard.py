@@ -29,6 +29,11 @@ if __name__ == '__main__':
     rf_popularity = pd.read_json("output/rf_popularity.json", lines=True)
     gbt_popularity = pd.read_json("output/gbt_popularity.json", lines=True)
 
+    with open('output/rf_time.txt', 'r') as f:
+        rf_perf = f.read()
+    with open('output/gbt_time.txt', 'r') as f:
+        gbt_perf = f.read()
+
     st.title("Big Data Project **2023**")
     st.write(
         "Panov Evgenii (e.panov@innopolis.university)"
@@ -69,6 +74,8 @@ if __name__ == '__main__':
     st.write(best_gbt_params)
     st.markdown("- Best model scores")
     st.write(best_gbt_scores)
+    st.markdown("- Model time taken")
+    st.write(gbt_perf)
     st.markdown("- Popularity example")
     st.write(gbt_popularity.head(20))
 
@@ -81,6 +88,8 @@ if __name__ == '__main__':
     st.write(best_rf_params)
     st.markdown("- Best model scores")
     st.write(best_rf_scores)
+    st.markdown("- Model time taken")
+    st.write(rf_perf)
     st.markdown("- Popularity example")
     st.write(rf_popularity.head(20))
 

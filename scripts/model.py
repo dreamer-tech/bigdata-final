@@ -1,3 +1,5 @@
+import time
+
 from pyspark.ml import Pipeline
 from pyspark.ml.regression import RandomForestRegressor, GBTRegressor
 from pyspark.ml.evaluation import RegressionEvaluator
@@ -82,6 +84,8 @@ if __name__ == '__main__':
         "sep", ","
     ).option("header", "true").csv(PATH + "pda/gbt_features")
 
+    rf_start_time = time.time()
+
     rf_data = df_tracks_enc
 
     rmse_evaluator = RegressionEvaluator(metricName="rmse", labelCol="popularity")
@@ -161,8 +165,15 @@ if __name__ == '__main__':
         "json"
     ).json(PATH + "pda/rf_popularity")
 
+    rf_end_time = time.time()
+
+    with open(PATH + 'rf_time.txt', 'w') as f:
+        f.write(str(int(rf_end_time - rf_start_time)) + 'sec.')
+
 
     # GBT model
+
+    gbt_start_time = time.time()
 
     gbt_data = df_tracks_enc
 
@@ -242,3 +253,8 @@ if __name__ == '__main__':
     gbt_predictions.select("prediction").limit(SAVE_LIMIT).coalesce(1).write.mode("overwrite").format(
         "json"
     ).json(PATH + "pda/gbt_popularity")
+
+    gbt_end_time = time.time()
+
+    with open(PATH + 'gbt_time.txt', 'w') as f:
+        f.write(str(int(gbt_end_time - gbt_start_time)) + 'sec.')
