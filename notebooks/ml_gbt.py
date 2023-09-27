@@ -81,7 +81,7 @@ if __name__ == '__main__':
         "sep", ","
     ).option("header", "true").csv(PATH + "pda/gbt_features")
 
-    gbt_data = df_tracks
+    gbt_data = df_tracks_enc
 
     rmse_evaluator = RegressionEvaluator(metricName="rmse", labelCol="popularity")
 
@@ -91,7 +91,7 @@ if __name__ == '__main__':
     gbt_model = GBTRegressor(labelCol="popularity", seed=42)
     gbt_params = (
         ParamGridBuilder()
-        .addGrid(gbt_model.maxIter, [10, 50, 100])
+        .addGrid(gbt_model.maxIter, [10, 50])
         .addGrid(gbt_model.maxDepth, [3, 4, 5])
         .build()
     )
@@ -155,3 +155,7 @@ if __name__ == '__main__':
     best_gbt_scores_df.coalesce(1).write.mode("overwrite").format("csv").option(
         "sep", ","
     ).option("header", "true").csv(PATH + "pda/best_gbt_scores")
+
+    gbt_predictions.select("prediction").limit(SAVE_LIMIT).coalesce(1).write.mode("overwrite").format(
+        "json"
+    ).json(PATH + "pda/gbt_popularity")

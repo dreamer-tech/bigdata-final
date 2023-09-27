@@ -1,399 +1,244 @@
-from __future__ import print_function
-
-from pyspark.ml.regression import RandomForestRegressor
-from pyspark.sql import SparkSession
-from pyspark.sql.types import IntegerType, ArrayType, DoubleType
-from pyspark.ml.evaluation import RegressionEvaluator, RankingEvaluator
-from pyspark.ml.recommendation import ALS
-from pyspark.ml.feature import VectorAssembler, MinMaxScaler
 from pyspark.ml import Pipeline
-from pyspark.ml.classification import RandomForestClassifier
-from pyspark.ml.tuning import CrossValidator, ParamGridBuilder
+from pyspark.ml.regression import RandomForestRegressor, GBTRegressor
+from pyspark.ml.evaluation import RegressionEvaluator
+from pyspark.ml.feature import VectorAssembler, MinMaxScaler
+from pyspark.ml.tuning import ParamGridBuilder, CrossValidator
+from pyspark.sql import SparkSession
 import pyspark.sql.functions as F
+from pyspark.sql.types import IntegerType, FloatType
+from collections import defaultdict
 
 
 SAVE_LIMIT = 100
-PATH = "output/"
+PATH = "../output/"
 
 
-spark = (
-    SparkSession.builder.appName("BD Project")
-    .master("local[*]")
-    .config("spark.driver.memory", "4g")
-    .config("spark.sql.catalogImplementation", "hive")
-    .config("hive.metastore.uris", "thrift://sandbox-hdp.hortonworks.com:9083")
-    .config("spark.sql.avro.compression.codec", "snappy")
-    .config(
-        "spark.jars",
-        "/usr/hdp/current/hive-client/lib/hive-metastore-1.2.1000.2.6.5.0-292.jar,/usr/hdp/current/hive-client/lib/hive-exec-1.2.1000.2.6.5.0-292.jar",
-    )
-    .config("spark.jars.packages", "org.apache.spark:spark-avro_2.11:2.4.4")
-    .enableHiveSupport()
-    .getOrCreate()
-)
-
-sc = spark.sparkContext
-sc.setLogLevel("OFF")
-
-print(spark.catalog.listDatabases())
-
-print(spark.catalog.listTables("projectdb"))
-
-tracks = spark.read.format("avro").table("projectdb.tracks_part")
-tracks.createOrReplaceTempView("tracks")
-
-artists = spark.read.format("avro").table("projectdb.artists_part")
-artists.createOrReplaceTempView("artists")
-
-tracks.printSchema()
-artists.printSchema()
-
-spark.sql("SELECT * FROM artists limit 5").show()
-
-spark.sql("SELECT * FROM tracks limit 5").show()
-
-
-# Data preparation
-# df_data = spark.sql("select * from recommendations")
-#
-# bool_dict = {
-#     False: 1,
-#     True: 2,
-# }
-#
-# encode_is_recommended = F.udf(lambda x: bool_dict[x], IntegerType())
-# rec_enc = df_data.withColumn(
-#     "is_recommended_enc", encode_is_recommended(F.col("is_recommended"))
-# )
-
-# Evaluation functions
-
-map_evaluator = RankingEvaluator(
-    labelCol="target_popularity",
-    predictionCol="predicted_popularity",
-    metricName="meanAveragePrecision",
-)
-ndcg_evaluator = RankingEvaluator(
-    labelCol="target_popularity",
-    predictionCol="predicted_popularity",
-    metricName="ndcgAtK",
-    k=5,
-)
-
-
-def get_preferences_list(s, k=5):
-    without_unliked = [el for el in s if el[1] > 1]
-
-    res = [ell[0] for ell in sorted(without_unliked, key=lambda x: x[1], reverse=True)]
-
-    if k is None:
-        return res
-    return res[:k]
-
-
-preferencesListUDF = F.udf(
-    lambda x: get_preferences_list(x, None), ArrayType(DoubleType())
-)
-fivePreferencesListUDF = F.udf(
-    lambda x: get_preferences_list(x, 5), ArrayType(DoubleType())
-)
-
-takeFirstFiveUDF = F.udf(lambda x: x[:5], ArrayType(DoubleType()))
-
-
-def get_preferences(df, in_column="", out_column="", custom_udf=preferencesListUDF):
-    return (
-        df.groupBy("user_id")
-        .agg(F.collect_list(F.array("app_id", F.col(in_column))).alias(out_column))
-        .withColumn(out_column, custom_udf(F.col(out_column)))
+if __name__ == '__main__':
+    spark = (
+        SparkSession.builder.appName("BD Project")
+        .master("local[*]")
+        .config("spark.driver.memory", "3g")
+        .config("spark.sql.catalogImplementation", "hive")
+        .config("hive.metastore.uris", "thrift://sandbox-hdp.hortonworks.com:9083")
+        .config("spark.sql.avro.compression.codec", "snappy")
+        .config(
+            "spark.jars",
+            "/usr/hdp/current/hive-client/lib/hive-metastore-1.2.1000.2.6.5.0-292.jar,/usr/hdp/current/hive-client/lib/hive-exec-1.2.1000.2.6.5.0-292.jar",
+        )
+        .config("spark.jars.packages", "org.apache.spark:spark-avro_2.11:2.4.4")
+        .enableHiveSupport()
+        .getOrCreate()
     )
 
+    sc = spark.sparkContext
+    sc.setLogLevel("OFF")
 
-def get_preference_data(prediction_df):
-    initial_recs = get_preferences(
-        prediction_df,
-        in_column="is_recommended_enc",
-        out_column="initial_recommendations",
+    tracks = spark.read.format("avro").table("projectdb.tracks_part")
+    tracks.createOrReplaceTempView("tracks")
+
+    artists = spark.read.format("avro").table("projectdb.artists_part")
+    artists.createOrReplaceTempView("artists")
+
+    df_tracks = spark.sql("select * from tracks limit 10000")
+    df_artists = spark.sql("select * from artists limit 10000")
+
+    artist_popularity, artist_followers = defaultdict(int), defaultdict(float)
+    for artist_id, followers, popularity in df_artists.select("artist_id", "followers", "popularity").collect():
+        artist_followers[artist_id] = followers
+        artist_popularity[artist_id] = popularity
+
+    custom_func = F.udf(lambda x: sum([artist_popularity[y] for y in eval(x)]), IntegerType())
+    df_tracks = df_tracks.withColumn('artists_popularity', custom_func(F.col("id_artists")))
+
+    custom_func = F.udf(lambda x: sum([artist_followers[y] for y in eval(x)]), FloatType())
+    df_tracks = df_tracks.withColumn('artists_followers', custom_func(F.col("id_artists")))
+
+    df_tracks = df_tracks.withColumn("release_year", F.year("release_date"))
+
+    feature_columns = [
+        "explicit",
+        "danceability",
+        "loudness",
+        "instrumentalness",
+        "release_year",
+        "artists_followers",
+        "artists_popularity"
+    ]
+    vector_assembler = VectorAssembler(
+        inputCols=feature_columns, outputCol="features_unscaled"
     )
-    predicted_recs = get_preferences(
-        prediction_df,
-        in_column="prediction",
-        out_column="prediction_recommendations",
-        custom_udf=fivePreferencesListUDF,
+    scaler = MinMaxScaler(inputCol="features_unscaled", outputCol="features")
+    pipeline = Pipeline(stages=[vector_assembler, scaler])
+    features_pipeline_model = pipeline.fit(df_tracks)
+    df_tracks_enc = features_pipeline_model.transform(df_tracks)
+
+    features = [(c,) for c in feature_columns]
+    features_df = spark.createDataFrame(data=features, schema=["feature"])
+    features_df.show()
+    features_df.coalesce(1).write.mode("overwrite").format("csv").option(
+        "sep", ","
+    ).option("header", "true").csv(PATH + "pda/rf_features")
+    features_df.coalesce(1).write.mode("overwrite").format("csv").option(
+        "sep", ","
+    ).option("header", "true").csv(PATH + "pda/gbt_features")
+
+    rf_data = df_tracks_enc
+
+    rmse_evaluator = RegressionEvaluator(metricName="rmse", labelCol="popularity")
+
+    # Cross-validation
+    rf_train_data, rf_test_data = rf_data.randomSplit([0.7, 0.3], seed=42)
+
+    rf_model = RandomForestRegressor(labelCol="popularity", seed=42)
+    rf_params = (
+        ParamGridBuilder()
+        .addGrid(rf_model.numTrees, [5, 7, 10])
+        .addGrid(rf_model.maxDepth, [3, 4, 5])
+        .build()
+    )
+    cv_rf = CrossValidator(
+        estimator=rf_model,
+        estimatorParamMaps=rf_params,
+        evaluator=rmse_evaluator,
+        parallelism=2,
+        numFolds=2,
+        seed=42,
+    )
+    cv_rf_model = cv_rf.fit(rf_train_data)
+
+    rf_params_mapped = [
+        dict([(y_rf[0].name, y_rf[1]) for y_rf in x_rf.items()]) for x_rf in rf_params
+    ]
+    rf_param_names = list(rf_params_mapped[0].keys())
+    cv_rf_config = [[float(x[name]) for name in rf_param_names] for x in rf_params_mapped]
+    cv_rf_config_df = spark.createDataFrame(data=cv_rf_config, schema=rf_param_names)
+    cv_rf_config_df.show()
+    cv_rf_config_df.coalesce(1).write.mode("overwrite").format("csv").option(
+        "sep", ","
+    ).option("header", "true").csv(PATH + "pda/cv_rf_config")
+
+    best_rf_numTrees = cv_rf_model.bestModel._java_obj.parent().getNumTrees()
+    best_rf_maxDepth = cv_rf_model.bestModel._java_obj.parent().getMaxDepth()
+    print("Best RF model numTrees = ", best_rf_numTrees)
+    print("Best RF model maxDepth = ", best_rf_maxDepth)
+    best_rf_params = [
+        ("numTrees", float(best_rf_numTrees)),
+        ("maxDepth", float(best_rf_maxDepth)),
+    ]
+    best_rf_params_df = spark.createDataFrame(
+        data=best_rf_params, schema=["parameter", "value"]
+    )
+    best_rf_params_df.show()
+    best_rf_params_df.coalesce(1).write.mode("overwrite").format("csv").option(
+        "sep", ","
+    ).option("header", "true").csv(PATH + "pda/best_rf_params")
+
+    final_rf = cv_rf_model.bestModel
+    final_rf.write().overwrite().save(PATH + "models/rf")
+
+    # Testing
+
+    rf_predictions = (
+        final_rf.transform(rf_test_data)
     )
 
-    transformed_data = initial_recs.join(predicted_recs, "user_id", "inner")
-    return transformed_data
+    rf_rmse_score = RegressionEvaluator(labelCol="popularity", predictionCol="prediction", metricName="rmse")
+    rf_rmse_score = rf_rmse_score.evaluate(rf_predictions)
+
+    rf_r2_score = RegressionEvaluator(labelCol="popularity", predictionCol="prediction", metricName="r2")
+    rf_r2_score = rf_r2_score.evaluate(rf_predictions)
+
+    best_rf_scores = [("RMSE", float(rf_rmse_score)), ("R2", float(rf_r2_score))]
+    best_rf_scores_df = spark.createDataFrame(
+        data=best_rf_scores, schema=["metric", "value"]
+    )
+    best_rf_scores_df.show()
+    best_rf_scores_df.coalesce(1).write.mode("overwrite").format("csv").option(
+        "sep", ","
+    ).option("header", "true").csv(PATH + "pda/best_rf_scores")
+
+    rf_predictions.select("prediction").limit(SAVE_LIMIT).coalesce(1).write.mode("overwrite").format(
+        "json"
+    ).json(PATH + "pda/rf_popularity")
 
 
-def evaluate_recommendations(prediction_df, model_name=""):
-    transformed_data = get_preference_data(prediction_df)
+    # GBT model
 
-    print("Start evaluating {} MAP...".format(model_name))
-    map_score = map_evaluator.evaluate(transformed_data)
-    print("Finish with {} MAP".format(model_name))
+    gbt_data = df_tracks_enc
 
-    print("Start evaluating {} NDCG...".format(model_name))
-    ndcg_score = ndcg_evaluator.evaluate(transformed_data)
-    print("Finish with {} NDCG".format(model_name))
+    rmse_evaluator = RegressionEvaluator(metricName="rmse", labelCol="popularity")
 
-    print("{} MAP score = {:.3f}".format(model_name, map_score))
-    print("{} NDCG score = {:.3f}".format(model_name, ndcg_score))
+    # Cross-validation
+    gbt_train_data, gbt_test_data = gbt_data.randomSplit([0.7, 0.3], seed=42)
 
-    return transformed_data, map_score, ndcg_score
+    gbt_model = GBTRegressor(labelCol="popularity", seed=42)
+    gbt_params = (
+        ParamGridBuilder()
+        .addGrid(gbt_model.maxIter, [10, 50])
+        .addGrid(gbt_model.maxDepth, [3, 4, 5])
+        .build()
+    )
+    cv_gbt = CrossValidator(
+        estimator=gbt_model,
+        estimatorParamMaps=gbt_params,
+        evaluator=rmse_evaluator,
+        parallelism=2,
+        numFolds=2,
+        seed=42,
+    )
+    cv_gbt_model = cv_gbt.fit(gbt_train_data)
 
+    gbt_params_mapped = [
+        dict([(y_gbt[0].name, y_gbt[1]) for y_gbt in x_gbt.items()]) for x_gbt in gbt_params
+    ]
+    gbt_param_names = list(gbt_params_mapped[0].keys())
+    cv_gbt_config = [[float(x[name]) for name in gbt_param_names] for x in gbt_params_mapped]
+    cv_gbt_config_df = spark.createDataFrame(data=cv_gbt_config, schema=gbt_param_names)
+    cv_gbt_config_df.show()
+    cv_gbt_config_df.coalesce(1).write.mode("overwrite").format("csv").option(
+        "sep", ","
+    ).option("header", "true").csv(PATH + "pda/cv_gbt_config")
 
-# ALS model
+    best_gbt_maxIter = cv_gbt_model.bestModel._java_obj.parent().getMaxIter()
+    best_gbt_maxDepth = cv_gbt_model.bestModel._java_obj.parent().getMaxDepth()
+    print("Best GBT model maxIter = ", best_gbt_maxIter)
+    print("Best GBT model maxDepth = ", best_gbt_maxDepth)
+    best_gbt_params = [
+        ("maxIter", float(best_gbt_maxIter)),
+        ("maxDepth", float(best_gbt_maxDepth)),
+    ]
+    best_gbt_params_df = spark.createDataFrame(
+        data=best_gbt_params, schema=["parameter", "value"]
+    )
+    best_gbt_params_df.show()
+    best_gbt_params_df.coalesce(1).write.mode("overwrite").format("csv").option(
+        "sep", ","
+    ).option("header", "true").csv(PATH + "pda/best_gbt_params")
 
-# als_data = rec_enc.drop(
-#     "helpful", "funny", "date_review", "hours", "review_id", "is_recommended"
-# )
-# print("ALS data")
-# als_data.show()
+    final_gbt = cv_gbt_model.bestModel
+    final_gbt.write().overwrite().save(PATH + "models/gbt")
 
+    # Testing
 
-rmse_evaluator = RegressionEvaluator(metricName="rmse", labelCol="is_recommended_enc")
+    gbt_predictions = (
+        final_gbt.transform(gbt_test_data)
+    )
 
+    gbt_rmse_score = RegressionEvaluator(labelCol="popularity", predictionCol="prediction", metricName="rmse")
+    gbt_rmse_score = gbt_rmse_score.evaluate(gbt_predictions)
 
-## Cross-validation
+    gbt_r2_score = RegressionEvaluator(labelCol="popularity", predictionCol="prediction", metricName="r2")
+    gbt_r2_score = gbt_r2_score.evaluate(gbt_predictions)
 
+    best_gbt_scores = [("RMSE", float(gbt_rmse_score)), ("R2", float(gbt_r2_score))]
+    best_gbt_scores_df = spark.createDataFrame(
+        data=best_gbt_scores, schema=["metric", "value"]
+    )
+    best_gbt_scores_df.show()
+    best_gbt_scores_df.coalesce(1).write.mode("overwrite").format("csv").option(
+        "sep", ","
+    ).option("header", "true").csv(PATH + "pda/best_gbt_scores")
 
-# als_train_data, als_test_data = als_data.randomSplit([0.7, 0.3], seed=42)
-#
-# als_model = ALS(
-#     userCol="user_id",
-#     itemCol="app_id",
-#     ratingCol="is_recommended_enc",
-#     seed=42,
-#     nonnegative=True,
-#     coldStartStrategy="drop",
-# )
-# als_params = (
-#     ParamGridBuilder()
-#     .addGrid(als_model.regParam, [0.05, 0.1])
-#     .addGrid(als_model.rank, [5, 10])
-#     .build()
-# )
-# cv_als = CrossValidator(
-#     estimator=als_model,
-#     estimatorParamMaps=als_params,
-#     evaluator=rmse_evaluator,
-#     parallelism=2,
-#     numFolds=2,
-#     seed=42,
-# )
-# cv_als_model = cv_als.fit(als_train_data)
-#
-#
-# als_params_mapped = [
-#     dict([(y_als[0].name, y_als[1]) for y_als in x_als.items()]) for x_als in als_params
-# ]
-# als_param_names = list(als_params_mapped[0].keys())
-# cv_als_config = [
-#     [float(x[name]) for name in als_param_names] for x in als_params_mapped
-# ]
-# cv_als_config_df = spark.createDataFrame(data=cv_als_config, schema=als_param_names)
-# cv_als_config_df.show()
-# cv_als_config_df.coalesce(1).write.mode("overwrite").format("csv").option(
-#     "sep", ","
-# ).option("header", "true").csv(PATH + "pda/cv_als_config")
-#
-#
-# best_als_regParam = cv_als_model.bestModel._java_obj.parent().getRegParam()
-# best_als_rank = cv_als_model.bestModel._java_obj.parent().getRank()
-#
-# print("Best ALS model regParam = ", best_als_regParam)
-# print("Best ALS model rank = ", best_als_rank)
-#
-# best_als_params = [
-#     ("regParam", float(best_als_regParam)),
-#     ("rank", float(best_als_rank)),
-# ]
-# best_als_params_df = spark.createDataFrame(
-#     data=best_als_params, schema=["parameter", "value"]
-# )
-# best_als_params_df.show()
-# best_als_params_df.coalesce(1).write.mode("overwrite").format("csv").option(
-#     "sep", ","
-# ).option("header", "true").csv(PATH + "pda/best_als_params")
-#
-# final_als = cv_als_model.bestModel
-# final_als.write().overwrite().save(PATH + "models/als")
-
-## Testing
-
-# als_predictions = final_als.transform(als_test_data)
-# als_predictions.show()
-#
-# als_recommendations, als_map_score, als_ndcg_score = evaluate_recommendations(
-#     als_predictions.withColumn(
-#         "is_recommended_enc", F.col("is_recommended_enc").cast("double")
-#     ),
-#     "ALS",
-# )
-#
-#
-# best_als_scores = [("MAP", float(als_map_score)), ("NDCG", float(als_ndcg_score))]
-# best_als_scores_df = spark.createDataFrame(
-#     data=best_als_scores, schema=["metric", "value"]
-# )
-# best_als_scores_df.show()
-# best_als_scores_df.coalesce(1).write.mode("overwrite").format("csv").option(
-#     "sep", ","
-# ).option("header", "true").csv(PATH + "pda/best_als_scores")
-#
-#
-# als_recommendations.limit(SAVE_LIMIT).coalesce(1).write.mode("overwrite").format(
-#     "json"
-# ).json(PATH + "pda/als_recommendations")
-
-
-# Random Forest model
-
-
-## Features encoding
-
-df_games = spark.sql("select * from games")
-df_games = df_games.withColumn("year", F.year("date_release"))
-df_games = df_games.drop("title", "steam_deck", "price_final", "date_release")
-df_games = (
-    df_games.withColumn("linux", F.col("linux").cast("double"))
-    .withColumn("mac", F.col("mac").cast("double"))
-    .withColumn("win", F.col("win").cast("double"))
-)
-
-rating_dict = {
-    "Overwhelmingly Positive": 8,
-    "Very Positive": 7,
-    "Positive": 6,
-    "Mostly Positive": 5,
-    "Mixed": 4,
-    "Mostly Negative": 3,
-    "Negative": 2,
-    "Very Negative": 1,
-    "Overwhelmingly Negative": 0,
-}
-encode_rating = F.udf(lambda x: rating_dict[x], IntegerType())
-df_games = df_games.withColumn("rating", encode_rating(F.col("rating")))
-df_games_rec = df_games.join(
-    rec_enc.select("is_recommended_enc", "app_id", "user_id"), "app_id", "inner"
-)
-df_games_rec = df_games_rec.withColumn(
-    "is_recommended_enc", F.col("is_recommended_enc").cast("double") - 1.0
-)
-
-
-feature_columns_rf = [
-    "explicit",
-    "danceability",
-    "loudness",
-    "instrumentalness",
-    "release_year",
-    "followers",
-    "artists_popularity",
-    "delta_days"
-]
-vector_assembler = VectorAssembler(
-    inputCols=feature_columns_rf, outputCol="features_unscaled"
-)
-scaler = MinMaxScaler(inputCol="features_unscaled", outputCol="features")
-pipeline = Pipeline(stages=[vector_assembler, scaler])
-features_pipeline_model_svc = pipeline.fit(df_games_rec)
-df_games_enc = features_pipeline_model_svc.transform(df_games_rec)
-df_games_enc.show()
-
-rf_features = [(c,) for c in feature_columns_rf]
-rf_features_df = spark.createDataFrame(data=rf_features, schema=["feature"])
-rf_features_df.show()
-rf_features_df.coalesce(1).write.mode("overwrite").format("csv").option(
-    "sep", ","
-).option("header", "true").csv(PATH + "pda/rf_features")
-
-
-rf_data = df_games_enc.select("user_id", "app_id", "is_recommended_enc", "features")
-rf_data.show()
-
-## Cross-validation
-rf_train_data, rf_test_data = rf_data.randomSplit([0.7, 0.3], seed=42)
-
-rf_model = RandomForestClassifier(labelCol="is_recommended_enc", seed=42)
-rf_params = (
-    ParamGridBuilder()
-    .addGrid(rf_model.numTrees, [5, 7, 10])
-    .addGrid(rf_model.maxDepth, [3, 4, 5])
-    .build()
-)
-cv_rf = CrossValidator(
-    estimator=rf_model,
-    estimatorParamMaps=rf_params,
-    evaluator=rmse_evaluator,
-    parallelism=2,
-    numFolds=2,
-    seed=42,
-)
-cv_rf_model = cv_rf.fit(rf_train_data)
-
-rf_params_mapped = [
-    dict([(y_rf[0].name, y_rf[1]) for y_rf in x_rf.items()]) for x_rf in rf_params
-]
-rf_param_names = list(rf_params_mapped[0].keys())
-cv_rf_config = [[float(x[name]) for name in rf_param_names] for x in rf_params_mapped]
-cv_rf_config_df = spark.createDataFrame(data=cv_rf_config, schema=rf_param_names)
-cv_rf_config_df.show()
-cv_rf_config_df.coalesce(1).write.mode("overwrite").format("csv").option(
-    "sep", ","
-).option("header", "true").csv(PATH + "pda/cv_rf_config")
-
-
-best_rf_numTrees = cv_rf_model.bestModel._java_obj.parent().getNumTrees()
-best_rf_maxDepth = cv_rf_model.bestModel._java_obj.parent().getMaxDepth()
-print("Best RF model numTrees = ", best_rf_numTrees)
-print("Best RF model maxDepth = ", best_rf_maxDepth)
-best_rf_params = [
-    ("numTrees", float(best_rf_numTrees)),
-    ("maxDepth", float(best_rf_maxDepth)),
-]
-best_rf_params_df = spark.createDataFrame(
-    data=best_rf_params, schema=["parameter", "value"]
-)
-best_rf_params_df.show()
-best_rf_params_df.coalesce(1).write.mode("overwrite").format("csv").option(
-    "sep", ","
-).option("header", "true").csv(PATH + "pda/best_rf_params")
-
-
-final_rf = cv_rf_model.bestModel
-final_rf.write().overwrite().save(PATH + "models/rf")
-
-## Testing
-
-rf_predictions = (
-    final_rf.transform(rf_test_data)
-    .select("user_id", "app_id", "is_recommended_enc", "prediction")
-    .withColumn("is_recommended_enc", F.col("is_recommended_enc") + 1)
-    .withColumn("prediction", F.col("prediction") + 1)
-)
-rf_predictions.show()
-
-
-# TODO: RMSE and R^2 for regression tasks?
-rf_recommendations, rf_map_score, rf_ndcg_score = evaluate_recommendations(
-    rf_predictions.withColumn(
-        "is_recommended_enc", F.col("is_recommended_enc").cast("double")
-    ),
-    "RF",
-)
-
-best_rf_scores = [("MAP", float(rf_map_score)), ("NDCG", float(rf_ndcg_score))]
-best_rf_scores_df = spark.createDataFrame(
-    data=best_rf_scores, schema=["metric", "value"]
-)
-best_rf_scores_df.show()
-best_rf_scores_df.coalesce(1).write.mode("overwrite").format("csv").option(
-    "sep", ","
-).option("header", "true").csv(PATH + "pda/best_rf_scores")
-
-
-rf_recommendations.limit(SAVE_LIMIT).coalesce(1).write.mode("overwrite").format(
-    "json"
-).json(PATH + "pda/rf_recommendations")
+    gbt_predictions.select("prediction").limit(SAVE_LIMIT).coalesce(1).write.mode("overwrite").format(
+        "json"
+    ).json(PATH + "pda/gbt_popularity")
