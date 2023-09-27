@@ -57,7 +57,7 @@ if __name__ == '__main__':
 
     df_tracks_enc = df_tracks
 
-    feature_columns_rf = [
+    feature_columns_gbt = [
         "explicit",
         "danceability",
         "loudness",
@@ -67,19 +67,19 @@ if __name__ == '__main__':
         "artists_popularity"
     ]
     vector_assembler = VectorAssembler(
-        inputCols=feature_columns_rf, outputCol="features_unscaled"
+        inputCols=feature_columns_gbt, outputCol="features_unscaled"
     )
     scaler = MinMaxScaler(inputCol="features_unscaled", outputCol="features")
     pipeline = Pipeline(stages=[vector_assembler, scaler])
     features_pipeline_model = pipeline.fit(df_tracks_enc)
     df_tracks_enc = features_pipeline_model.transform(df_tracks_enc)
 
-    rf_features = [(c,) for c in feature_columns_rf]
-    rf_features_df = spark.createDataFrame(data=rf_features, schema=["feature"])
-    rf_features_df.show()
-    rf_features_df.coalesce(1).write.mode("overwrite").format("csv").option(
+    gbt_features = [(c,) for c in feature_columns_gbt]
+    gbt_features_df = spark.createDataFrame(data=gbt_features, schema=["feature"])
+    gbt_features_df.show()
+    gbt_features_df.coalesce(1).write.mode("overwrite").format("csv").option(
         "sep", ","
-    ).option("header", "true").csv(PATH + "pda/rf_features")
+    ).option("header", "true").csv(PATH + "pda/gbt_features")
 
     gbt_data = df_tracks
 
