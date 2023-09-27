@@ -39,8 +39,8 @@ if __name__ == '__main__':
     artists = spark.read.format("avro").table("projectdb.artists_part")
     artists.createOrReplaceTempView("artists")
 
-    df_tracks = spark.sql("select * from tracks limit 10000")
-    df_artists = spark.sql("select * from artists limit 10000")
+    df_tracks = spark.sql("select * from tracks")
+    df_artists = spark.sql("select * from artists")
 
     artist_popularity, artist_followers = defaultdict(int), defaultdict(float)
     for artist_id, followers, popularity in df_artists.select("artist_id", "followers", "popularity").collect():
@@ -101,7 +101,7 @@ if __name__ == '__main__':
         estimatorParamMaps=rf_params,
         evaluator=rmse_evaluator,
         parallelism=2,
-        numFolds=2,
+        numFolds=4,
         seed=42,
     )
     cv_rf_model = cv_rf.fit(rf_train_data)
@@ -174,7 +174,7 @@ if __name__ == '__main__':
     gbt_model = GBTRegressor(labelCol="popularity", seed=42)
     gbt_params = (
         ParamGridBuilder()
-        .addGrid(gbt_model.maxIter, [10, 50])
+        .addGrid(gbt_model.maxIter, [10, 50, 100])
         .addGrid(gbt_model.maxDepth, [3, 4, 5])
         .build()
     )
@@ -183,7 +183,7 @@ if __name__ == '__main__':
         estimatorParamMaps=gbt_params,
         evaluator=rmse_evaluator,
         parallelism=2,
-        numFolds=2,
+        numFolds=4,
         seed=42,
     )
     cv_gbt_model = cv_gbt.fit(gbt_train_data)

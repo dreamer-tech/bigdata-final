@@ -14,8 +14,8 @@ bash scripts/stage2.sh
 echo "Running Stage 3 of the pipeline - Spark ML"
 bash scripts/stage3.sh
 
-#echo "Running Stage 4 of the pipeline - Streamlit"
-#bash scripts/stage4.sh
+echo "Running Stage 4 of the pipeline - Streamlit"
+bash scripts/stage4.sh
 
 # Post-processing
 echo "Running post-processing!"

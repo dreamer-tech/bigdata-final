@@ -17,8 +17,8 @@ rm -f output/best_gbt_params.csv
 cat output/pda/best_gbt_params/* >> output/best_gbt_params.csv
 rm -f output/best_gbt_scores.csv
 cat output/pda/best_gbt_scores/* >> output/best_gbt_scores.csv
-rm -f output/gbt_recommendations.json
-cat output/pda/gbt_recommendations/* >> output/gbt_recommendations.json
+rm -f output/gbt_popularity.json
+cat output/pda/gbt_popularity/* >> output/gbt_popularity.json
 
 rm -f output/cv_rf_config.csv
 cat output/pda/cv_rf_config/* >> output/cv_rf_config.csv
