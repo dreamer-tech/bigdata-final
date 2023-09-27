@@ -8,7 +8,7 @@ from pyspark.ml.feature import VectorAssembler, MinMaxScaler
 from pyspark.ml.tuning import ParamGridBuilder, CrossValidator
 from pyspark.sql import SparkSession
 import pyspark.sql.functions as F
-
+from pyspark.sql.types import StringType
 
 SAVE_LIMIT = 100
 PATH = "../output/"
@@ -34,23 +34,34 @@ if __name__ == '__main__':
     sc = spark.sparkContext
     sc.setLogLevel("OFF")
 
-    print(spark.catalog.listDatabases())
-
-    print(spark.catalog.listTables("projectdb"))
-
     tracks = spark.read.format("avro").table("projectdb.tracks_part")
     tracks.createOrReplaceTempView("tracks")
 
-    tracks.printSchema()
+    artists = spark.read.format("avro").table("projectdb.artists_part")
+    artists.createOrReplaceTempView("artists")
 
     df_tracks = spark.sql("select * from tracks")
+    df_artists = spark.sql("select * from artists")
 
-    print(df_tracks.printSchema())
+    # tracks_df['id_artists'] = [i[2:-2] for i in tracks_df['id_artists']]
+    custom_func = F.udf(lambda x: x[2:-2], StringType())
+    df_tracks = df_tracks.withColumn("id_artists", custom_func(F.col("id_artists")))
 
-    print(df_tracks.head(3))
-
+    # tracks_df['release_year'] = [int(i.split('-')[0]) for i in tracks_df['release_date']]
     df_tracks = df_tracks.withColumn("release_year", F.year("release_date"))
+
+    # artists_df.rename(columns={'id': 'id_artists', 'popularity': 'artists_popularity'}, inplace=True)
+    df_artists = df_artists.withColumn("id_artists", F.col("id"))
+    df_artists = df_artists.withColumn("artists_popularity", F.col("popularity"))
+
+    # artists_df.drop(['genres', 'name'], axis=1, inplace=True)
+    df_artists = df_artists.drop("id", "popularity")
+
+    # tracks_df = tracks_df.merge(artists_df, on='id_artists')
+    df_tracks = df_tracks.join(df_artists, on='id_artists')
+
     print(df_tracks.head(3))
+    exit(0)
 
     # df_games = df_games.drop("title", "steam_deck", "price_final", "date_release")
     # df_games = (
