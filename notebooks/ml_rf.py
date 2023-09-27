@@ -3,7 +3,7 @@ import datetime
 import pandas as pd
 from pyspark.ml import Pipeline
 from pyspark.ml.classification import RandomForestClassifier
-from pyspark.ml.evaluation import RegressionEvaluator
+from pyspark.ml.evaluation import RegressionEvaluator,
 from pyspark.ml.feature import VectorAssembler, MinMaxScaler
 from pyspark.ml.tuning import ParamGridBuilder, CrossValidator
 from pyspark.sql import SparkSession
@@ -13,6 +13,44 @@ from collections import defaultdict
 
 SAVE_LIMIT = 100
 PATH = "../output/"
+
+
+rmse_evaluator = RegressionEvaluator(metricName="rmse", predictionCol='', labelCol="popularity")
+r2_evaluator = RegressionEvaluator(metricName="r2", predictionCol='', labelCol="popularity")
+
+
+def get_preference_data(prediction_df):
+    initial_recs = get_preferences(
+        prediction_df,
+        in_column="is_recommended_enc",
+        out_column="initial_recommendations",
+    )
+    predicted_recs = get_preferences(
+        prediction_df,
+        in_column="prediction",
+        out_column="prediction_recommendations",
+        custom_udf=fivePreferencesListUDF,
+    )
+
+    transformed_data = initial_recs.join(predicted_recs, "user_id", "inner")
+    return transformed_data
+
+
+def evaluate_recommendations(prediction_df, model_name=""):
+    transformed_data = get_preference_data(prediction_df)
+
+    print("Start evaluating {} RMSE...".format(model_name))
+    rmse_score = rmse_evaluator.evaluate(transformed_data)
+    print("Finish with {} RMSE".format(model_name))
+
+    print("Start evaluating {} R2...".format(model_name))
+    r2_score = r2_evaluator.evaluate(transformed_data)
+    print("Finish with {} R2".format(model_name))
+
+    print("{} RMSE score = {:.3f}".format(model_name, rmse_score))
+    print("{} R2 score = {:.3f}".format(model_name, r2_score))
+
+    return transformed_data, rmse_score, r2_score
 
 
 if __name__ == '__main__':
@@ -118,7 +156,7 @@ if __name__ == '__main__':
     pipeline = Pipeline(stages=[vector_assembler, scaler])
     features_pipeline_model_svc = pipeline.fit(df_tracks_enc)
     df_tracks_enc = features_pipeline_model_svc.transform(df_tracks_enc)
-    df_tracks_enc.show()
+    # df_tracks_enc.show()
 
     rf_features = [(c,) for c in feature_columns_rf]
     rf_features_df = spark.createDataFrame(data=rf_features, schema=["feature"])
@@ -128,12 +166,10 @@ if __name__ == '__main__':
     ).option("header", "true").csv(PATH + "pda/rf_features")
 
     rf_data = df_tracks_enc
-    rf_data.show()
+    # rf_data.show()
 
     ## Cross-validation
     rf_train_data, rf_test_data = rf_data.randomSplit([0.7, 0.3], seed=42)
-
-    rmse_evaluator = RegressionEvaluator(metricName="rmse", labelCol="popularity")
 
     rf_model = RandomForestClassifier(labelCol="popularity", seed=42)
     rf_params = (
@@ -182,27 +218,25 @@ if __name__ == '__main__':
     final_rf = cv_rf_model.bestModel
     final_rf.write().overwrite().save(PATH + "models/rf")
 
-    exit(0)
-
     ## Testing
 
     rf_predictions = (
         final_rf.transform(rf_test_data)
-        .select("user_id", "app_id", "is_recommended_enc", "prediction")
-        .withColumn("is_recommended_enc", F.col("is_recommended_enc") + 1)
-        .withColumn("prediction", F.col("prediction") + 1)
+        # .select("user_id", "app_id", "is_recommended_enc", "prediction")
+        # .withColumn("is_recommended_enc", F.col("is_recommended_enc") + 1)
+        # .withColumn("prediction", F.col("prediction") + 1)
     )
     rf_predictions.show()
+    exit(0)
 
-    # TODO: RMSE and R^2 for regression tasks?
-    rf_recommendations, rf_map_score, rf_ndcg_score = evaluate_recommendations(
+    rf_recommendations, rf_rmse_score, rf_r2_score = evaluate_recommendations(
         rf_predictions.withColumn(
             "is_recommended_enc", F.col("is_recommended_enc").cast("double")
         ),
         "RF",
     )
 
-    best_rf_scores = [("MAP", float(rf_map_score)), ("NDCG", float(rf_ndcg_score))]
+    best_rf_scores = [("RMSE", float(rf_rmse_score)), ("R2", float(rf_r2_score))]
     best_rf_scores_df = spark.createDataFrame(
         data=best_rf_scores, schema=["metric", "value"]
     )
@@ -214,4 +248,3 @@ if __name__ == '__main__':
     rf_recommendations.limit(SAVE_LIMIT).coalesce(1).write.mode("overwrite").format(
         "json"
     ).json(PATH + "pda/rf_recommendations")
-
