@@ -3,7 +3,7 @@ import datetime
 import pandas as pd
 from pyspark.ml import Pipeline
 from pyspark.ml.classification import RandomForestClassifier
-from pyspark.ml.evaluation import RegressionEvaluator,
+from pyspark.ml.evaluation import RegressionEvaluator
 from pyspark.ml.feature import VectorAssembler, MinMaxScaler
 from pyspark.ml.tuning import ParamGridBuilder, CrossValidator
 from pyspark.sql import SparkSession
@@ -19,38 +19,38 @@ rmse_evaluator = RegressionEvaluator(metricName="rmse", predictionCol='', labelC
 r2_evaluator = RegressionEvaluator(metricName="r2", predictionCol='', labelCol="popularity")
 
 
-def get_preference_data(prediction_df):
-    initial_recs = get_preferences(
-        prediction_df,
-        in_column="is_recommended_enc",
-        out_column="initial_recommendations",
-    )
-    predicted_recs = get_preferences(
-        prediction_df,
-        in_column="prediction",
-        out_column="prediction_recommendations",
-        custom_udf=fivePreferencesListUDF,
-    )
-
-    transformed_data = initial_recs.join(predicted_recs, "user_id", "inner")
-    return transformed_data
-
-
-def evaluate_recommendations(prediction_df, model_name=""):
-    transformed_data = get_preference_data(prediction_df)
-
-    print("Start evaluating {} RMSE...".format(model_name))
-    rmse_score = rmse_evaluator.evaluate(transformed_data)
-    print("Finish with {} RMSE".format(model_name))
-
-    print("Start evaluating {} R2...".format(model_name))
-    r2_score = r2_evaluator.evaluate(transformed_data)
-    print("Finish with {} R2".format(model_name))
-
-    print("{} RMSE score = {:.3f}".format(model_name, rmse_score))
-    print("{} R2 score = {:.3f}".format(model_name, r2_score))
-
-    return transformed_data, rmse_score, r2_score
+# def get_preference_data(prediction_df):
+#     initial_recs = get_preferences(
+#         prediction_df,
+#         in_column="is_recommended_enc",
+#         out_column="initial_recommendations",
+#     )
+#     predicted_recs = get_preferences(
+#         prediction_df,
+#         in_column="prediction",
+#         out_column="prediction_recommendations",
+#         custom_udf=fivePreferencesListUDF,
+#     )
+#
+#     transformed_data = initial_recs.join(predicted_recs, "user_id", "inner")
+#     return transformed_data
+#
+#
+# def evaluate_recommendations(prediction_df, model_name=""):
+#     transformed_data = get_preference_data(prediction_df)
+#
+#     print("Start evaluating {} RMSE...".format(model_name))
+#     rmse_score = rmse_evaluator.evaluate(transformed_data)
+#     print("Finish with {} RMSE".format(model_name))
+#
+#     print("Start evaluating {} R2...".format(model_name))
+#     r2_score = r2_evaluator.evaluate(transformed_data)
+#     print("Finish with {} R2".format(model_name))
+#
+#     print("{} RMSE score = {:.3f}".format(model_name, rmse_score))
+#     print("{} R2 score = {:.3f}".format(model_name, r2_score))
+#
+#     return transformed_data, rmse_score, r2_score
 
 
 if __name__ == '__main__':
