@@ -17,6 +17,10 @@ if __name__ == '__main__':
     artists = pd.read_csv("data/artists.csv")
     tracks = pd.read_csv("data/tracks.csv")
 
+    q1 = pd.read_csv("output/q1.csv")
+    q2 = pd.read_csv("output/q2.csv")
+    q3 = pd.read_csv("output/q3.csv")
+
     cv_gbt_config = pd.read_csv("output/cv_gbt_config.csv")
     best_gbt_params = pd.read_csv("output/best_gbt_params.csv")
     best_gbt_scores = pd.read_csv("output/best_gbt_scores.csv")
@@ -63,6 +67,31 @@ if __name__ == '__main__':
 
     st.markdown("`tracks` table")
     st.write(tracks.head(5))
+
+    st.markdown("---")
+    st.header("Exploratory Data Analysis")
+    st.subheader("Q1")
+    st.markdown("Correlation between popularity and the track's release year")
+    st.write(q1)
+    st.markdown(
+        "As we can see, the correlation is relatively high, so we want to use it as a feature"
+    )
+
+    st.subheader("Q2")
+    st.markdown("How many danceable tracks are in the most popular ones?")
+    st.write(q2)
+    st.markdown(
+        "As we can see, most of the popular tracks and danceable as well. So this parameter is very useful for us"
+    )
+
+    st.subheader("Q3")
+    st.markdown(
+        "Correlation between popularity and instrumentalness"
+    )
+    st.write(q3)
+    st.markdown(
+        "As we can see, there is no correlation between popularity and instrumentalness, which means that such feature doesn't exist"
+    )
 
     st.markdown("---")
     st.header("Predictive Data Analytics")
