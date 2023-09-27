@@ -1,6 +1,3 @@
-import datetime
-
-import pandas as pd
 from pyspark.ml import Pipeline
 from pyspark.ml.classification import RandomForestClassifier
 from pyspark.ml.evaluation import RegressionEvaluator
@@ -8,45 +5,11 @@ from pyspark.ml.feature import VectorAssembler, MinMaxScaler
 from pyspark.ml.tuning import ParamGridBuilder, CrossValidator
 from pyspark.sql import SparkSession
 import pyspark.sql.functions as F
-from pyspark.sql.types import StringType, IntegerType, FloatType
+from pyspark.sql.types import IntegerType, FloatType
 from collections import defaultdict
 
 SAVE_LIMIT = 100
 PATH = "../output/"
-
-
-# def get_preference_data(prediction_df):
-#     initial_recs = get_preferences(
-#         prediction_df,
-#         in_column="is_recommended_enc",
-#         out_column="initial_recommendations",
-#     )
-#     predicted_recs = get_preferences(
-#         prediction_df,
-#         in_column="prediction",
-#         out_column="prediction_recommendations",
-#         custom_udf=fivePreferencesListUDF,
-#     )
-#
-#     transformed_data = initial_recs.join(predicted_recs, "user_id", "inner")
-#     return transformed_data
-#
-#
-# def evaluate_recommendations(prediction_df, model_name=""):
-#     transformed_data = get_preference_data(prediction_df)
-#
-#     print("Start evaluating {} RMSE...".format(model_name))
-#     rmse_score = rmse_evaluator.evaluate(transformed_data)
-#     print("Finish with {} RMSE".format(model_name))
-#
-#     print("Start evaluating {} R2...".format(model_name))
-#     r2_score = r2_evaluator.evaluate(transformed_data)
-#     print("Finish with {} R2".format(model_name))
-#
-#     print("{} RMSE score = {:.3f}".format(model_name, rmse_score))
-#     print("{} R2 score = {:.3f}".format(model_name, r2_score))
-#
-#     return transformed_data, rmse_score, r2_score
 
 
 if __name__ == '__main__':
@@ -89,49 +52,7 @@ if __name__ == '__main__':
     custom_func = F.udf(lambda x: sum([artist_followers[y] for y in eval(x)]), FloatType())
     df_tracks = df_tracks.withColumn('artists_followers', custom_func(F.col("id_artists")))
 
-    # tracks_df['id_artists'] = [i[2:-2] for i in tracks_df['id_artists']]
-    # custom_func = F.udf(lambda x: x[2:-2], StringType())
-    # df_tracks = df_tracks.withColumn("id_artists", custom_func(F.col("id_artists")))
-
-    # tracks_df['release_year'] = [int(i.split('-')[0]) for i in tracks_df['release_date']]
     df_tracks = df_tracks.withColumn("release_year", F.year("release_date"))
-
-    # artists_df.rename(columns={'id': 'id_artists', 'popularity': 'artists_popularity'}, inplace=True)
-    # df_artists = df_artists.withColumn("id_artists", F.col("artist_id"))
-    # df_artists = df_artists.withColumn("artists_popularity", F.col("popularity"))
-
-    # artists_df.drop(['genres', 'name'], axis=1, inplace=True)
-    # df_artists = df_artists.drop("artist_id", "popularity", "genres", "artist_name")
-
-    # tracks_df = tracks_df.merge(artists_df, on='id_artists')
-    # df_tracks = df_tracks.join(df_artists, on='id_artists')
-
-    # df_games = df_games.drop("title", "steam_deck", "price_final", "date_release")
-    # df_games = (
-    #     df_games.withColumn("linux", F.col("linux").cast("double"))
-    #     .withColumn("mac", F.col("mac").cast("double"))
-    #     .withColumn("win", F.col("win").cast("double"))
-    # )
-
-    # rating_dict = {
-    #     "Overwhelmingly Positive": 8,
-    #     "Very Positive": 7,
-    #     "Positive": 6,
-    #     "Mostly Positive": 5,
-    #     "Mixed": 4,
-    #     "Mostly Negative": 3,
-    #     "Negative": 2,
-    #     "Very Negative": 1,
-    #     "Overwhelmingly Negative": 0,
-    # }
-    # encode_rating = F.udf(lambda x: rating_dict[x], IntegerType())
-    # df_games = df_games.withColumn("rating", encode_rating(F.col("rating")))
-    # df_games_rec = df_games.join(
-    #     rec_enc.select("is_recommended_enc", "app_id", "user_id"), "app_id", "inner"
-    # )
-    # df_games_rec = df_games_rec.withColumn(
-    #     "is_recommended_enc", F.col("is_recommended_enc").cast("double") - 1.0
-    # )
 
     df_tracks_enc = df_tracks
 
@@ -152,7 +73,6 @@ if __name__ == '__main__':
     pipeline = Pipeline(stages=[vector_assembler, scaler])
     features_pipeline_model_svc = pipeline.fit(df_tracks_enc)
     df_tracks_enc = features_pipeline_model_svc.transform(df_tracks_enc)
-    # df_tracks_enc.show()
 
     rf_features = [(c,) for c in feature_columns_rf]
     rf_features_df = spark.createDataFrame(data=rf_features, schema=["feature"])
@@ -162,7 +82,6 @@ if __name__ == '__main__':
     ).option("header", "true").csv(PATH + "pda/rf_features")
 
     rf_data = df_tracks_enc
-    # rf_data.show()
 
     rmse_evaluator = RegressionEvaluator(metricName="rmse", labelCol="popularity")
     r2_evaluator = RegressionEvaluator(metricName="r2", labelCol="popularity")
@@ -221,27 +140,13 @@ if __name__ == '__main__':
 
     rf_predictions = (
         final_rf.transform(rf_test_data)
-        # .select("user_id", "app_id", "is_recommended_enc", "prediction")
-        # .withColumn("is_recommended_enc", F.col("is_recommended_enc") + 1)
-        # .withColumn("prediction", F.col("prediction") + 1)
     )
 
-    rmse = RegressionEvaluator(labelCol="popularity", predictionCol="prediction", metricName="rmse")
-    rmse = rmse.evaluate(rf_predictions)
-    print(rmse)
+    rf_rmse_score = RegressionEvaluator(labelCol="popularity", predictionCol="prediction", metricName="rmse")
+    rf_rmse_score = rf_rmse_score.evaluate(rf_predictions)
 
-    r2 = RegressionEvaluator(labelCol="popularity", predictionCol="prediction", metricName="r2")
-    r2 = r2.evaluate(rf_predictions)
-    print(r2)
-
-    exit(0)
-
-    rf_recommendations, rf_rmse_score, rf_r2_score = evaluate_recommendations(
-        rf_predictions.withColumn(
-            "is_recommended_enc", F.col("is_recommended_enc").cast("double")
-        ),
-        "RF",
-    )
+    rf_r2_score = RegressionEvaluator(labelCol="popularity", predictionCol="prediction", metricName="r2")
+    rf_r2_score = rf_r2_score.evaluate(rf_predictions)
 
     best_rf_scores = [("RMSE", float(rf_rmse_score)), ("R2", float(rf_r2_score))]
     best_rf_scores_df = spark.createDataFrame(
@@ -251,7 +156,3 @@ if __name__ == '__main__':
     best_rf_scores_df.coalesce(1).write.mode("overwrite").format("csv").option(
         "sep", ","
     ).option("header", "true").csv(PATH + "pda/best_rf_scores")
-
-    rf_recommendations.limit(SAVE_LIMIT).coalesce(1).write.mode("overwrite").format(
-        "json"
-    ).json(PATH + "pda/rf_recommendations")
