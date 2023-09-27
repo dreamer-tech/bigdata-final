@@ -8,7 +8,7 @@ from pyspark.ml.feature import VectorAssembler, MinMaxScaler
 from pyspark.ml.tuning import ParamGridBuilder, CrossValidator
 from pyspark.sql import SparkSession
 import pyspark.sql.functions as F
-from pyspark.sql.types import StringType
+from pyspark.sql.types import StringType, IntegerType, FloatType
 
 SAVE_LIMIT = 100
 PATH = "../output/"
@@ -43,22 +43,33 @@ if __name__ == '__main__':
     df_tracks = spark.sql("select * from tracks")
     df_artists = spark.sql("select * from artists")
 
+    artist_popularity, artist_followers = {}, {}
+    for artist_id, followers, popularity in df_artists.select("artist_id", "followers", "popularity").collect():
+        artist_followers[artist_id] = followers
+        artist_popularity[artist_id] = popularity
+
+    custom_func = F.udf(lambda x: sum([artist_popularity[y] for y in eval(x)]), IntegerType())
+    df_tracks = df_tracks.withColumn('artists_popularity', custom_func(F.col("id_artists")))
+
+    custom_func = F.udf(lambda x: sum([artist_followers[y] for y in eval(x)]), FloatType())
+    df_tracks = df_tracks.withColumn('artists_followers', custom_func(F.col("id_artists")))
+
     # tracks_df['id_artists'] = [i[2:-2] for i in tracks_df['id_artists']]
-    custom_func = F.udf(lambda x: x[2:-2], StringType())
-    df_tracks = df_tracks.withColumn("id_artists", custom_func(F.col("id_artists")))
+    # custom_func = F.udf(lambda x: x[2:-2], StringType())
+    # df_tracks = df_tracks.withColumn("id_artists", custom_func(F.col("id_artists")))
 
     # tracks_df['release_year'] = [int(i.split('-')[0]) for i in tracks_df['release_date']]
     df_tracks = df_tracks.withColumn("release_year", F.year("release_date"))
 
     # artists_df.rename(columns={'id': 'id_artists', 'popularity': 'artists_popularity'}, inplace=True)
-    df_artists = df_artists.withColumn("id_artists", F.col("artist_id"))
-    df_artists = df_artists.withColumn("artists_popularity", F.col("popularity"))
+    # df_artists = df_artists.withColumn("id_artists", F.col("artist_id"))
+    # df_artists = df_artists.withColumn("artists_popularity", F.col("popularity"))
 
     # artists_df.drop(['genres', 'name'], axis=1, inplace=True)
-    df_artists = df_artists.drop("artist_id", "popularity", "genres", "artist_name")
+    # df_artists = df_artists.drop("artist_id", "popularity", "genres", "artist_name")
 
     # tracks_df = tracks_df.merge(artists_df, on='id_artists')
-    df_tracks = df_tracks.join(df_artists, on='id_artists')
+    # df_tracks = df_tracks.join(df_artists, on='id_artists')
 
     print(df_tracks.head(3))
     exit(0)
